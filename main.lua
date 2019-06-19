@@ -1,18 +1,13 @@
-Camera = require "hump.camera"
-
-local camera
+Gamestate = require "hump.gamestate"
+battleScene = require "battlescene"
 
 function love.load()
-	camera = Camera(0, 0)
+  Gamestate.registerEvents()
+  Gamestate.switch(battleScene)
 end
 
 function love.update(dt)
-	camera:move(dt * 100, dt * 100)
 end
 
 function love.draw()
-	camera:attach()
-	love.graphics.setColor(1, 1, 0, 1)
-	love.graphics.rectangle("fill", 0, 0, 100, 100)
-	camera:detach()
 end
