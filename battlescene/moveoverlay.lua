@@ -22,6 +22,11 @@ return function()
 
   --| @param map - The map to use to calculate movement
   function overlay:calculateMovementTiles(map)
+    if self.selectedEntity == nil then
+      self.movementTiles = {}
+      return
+    end
+
     local confirmed = {} -- Confirmed movement options
     -- List of positions to explore, {x, y, d} where d is the distance from the base pos
     local positionsToExplore = {{self.selectedEntity.tx, self.selectedEntity.ty, 0}}

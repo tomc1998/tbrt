@@ -1,4 +1,4 @@
-mod = {}
+local mod = {}
 
 mod.empty = 0
 mod.plain = 1
