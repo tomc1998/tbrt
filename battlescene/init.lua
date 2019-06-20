@@ -2,6 +2,7 @@ local tile = require "battlescene.tile"
 local map_m = require "battlescene.map"
 local moveoverlay_m = require "battlescene.moveoverlay"
 local commandoverlay_m = require "battlescene.commandoverlay"
+local commandtimeoverlay_m = require "battlescene.commandtimeoverlay"
 local command = require "battlescene.command"
 
 local Hero0 = require "entities.hero0"
@@ -35,7 +36,9 @@ function battleScene:init()
   local moveOverlay = moveoverlay_m()
   self.map:addTileOverlay(moveOverlay)
   local commandOverlay = commandoverlay_m(self.currTurnCommands)
+  local commandTimeOverlay = commandtimeoverlay_m(self.currTurnCommands)
   self.map:addTileOverlay(commandOverlay)
+  self.map:addTileOverlay(commandTimeOverlay)
 
   self.map:addSelectListener(function(tx,ty)
       local entityPressed = self.map:getEntity(tx, ty)
@@ -95,6 +98,7 @@ function battleScene:keypressed(key, scancode, isrepeat)
     -- End turn
     for ii = 1,#self.currTurnCommands do
       for k,v in pairs(self.currTurnCommands[ii]) do print(k,v) end
+      print(self.currTurnCommands[ii]:getTime())
       print ""
     end
     print "\n"

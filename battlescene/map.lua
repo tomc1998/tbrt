@@ -44,8 +44,9 @@ function mod.Map(w, tiles)
 
   --| Add an overlay. Overlays are tables with a draw(...) function:
   --| function overlay:draw(x, y, tx, ty)
-  --| This draw function is called after every tile is rendered, with the given
-  --| x / y / tx / ty positions. x/y is at the centre of the tile.
+  --| This draw function is called after all tiles is rendered, with the given
+  --| x / y / tx / ty positions of all the tiles in succession. x/y is at the
+  --| centre of the tile.
   function map:addTileOverlay(overlay)
     table.insert(self.overlays, overlay)
   end
@@ -82,31 +83,33 @@ function mod.Map(w, tiles)
         elseif tt ~= tile.empty then
           assert(false, "Bad tile type " .. tostring(tt))
         end
-        -- Draw overlays, saving color
-        r,g,b,a = love.graphics.getColor()
-        for kk = 1,#self.overlays do
-          local x = x + tileToWorld(jj) + mod.TILE_SIZE/2
-          local y = y + tileToWorld(ii) + mod.TILE_SIZE/2
-          self.overlays[kk]:draw(x, y, jj, ii)
-        end
-        love.graphics.setColor(r,g,b,a)
       end
     end
-
 
     -- Draw hover box (highlight the tile under the cursor)
     if self.hovered_x ~= nil and self.hovered_y ~= nil then
       love.graphics.setColor(0, 0.5, 1, 1)
       love.graphics.setLineWidth(2)
       love.graphics.rectangle('line',
-                              tileToWorld(self.hovered_x),
-                              tileToWorld(self.hovered_y),
-                              mod.TILE_SIZE, mod.TILE_SIZE)
+                              tileToWorld(self.hovered_x)-1,
+                              tileToWorld(self.hovered_y)-1,
+                              mod.TILE_SIZE+2, mod.TILE_SIZE+2)
       love.graphics.setColor(0.3, 0.8, 1, 0.1)
       love.graphics.rectangle('fill',
                               tileToWorld(self.hovered_x),
                               tileToWorld(self.hovered_y),
                               mod.TILE_SIZE, mod.TILE_SIZE)
+    end
+
+    -- Draw overlays, saving color
+    for kk = 1,#self.overlays do
+      for ii = 1,self.h do
+        for jj = 1,self.w do
+          local x = x + tileToWorld(jj) + mod.TILE_SIZE/2
+          local y = y + tileToWorld(ii) + mod.TILE_SIZE/2
+          self.overlays[kk]:draw(x, y, jj, ii)
+        end
+      end
     end
 
     love.graphics.pop()
