@@ -33,7 +33,9 @@ return function()
 
     while #positionsToExplore > 0 do
       local base_pos = table.remove(positionsToExplore, #positionsToExplore)
-      if base_pos[3]+1 <= self.selectedEntity.e.movement then
+      -- Check if we have enough movement left to move here
+      local enoughMovement = base_pos[3]+1 <= self.selectedEntity.e.movement
+      if enoughMovement then
         -- Get the positions we can reach from pos, and make sure we haven't
         -- already got these positions
         local new_d = base_pos[3]+1
@@ -44,7 +46,12 @@ return function()
 
         for ii = 1,#new_pos do
           local pos = new_pos[ii]
-          if pos[1] >= 1 and pos[1] <= map.w and pos[2] >= 1 and pos[2] <= map.h then
+          -- Check if we're just looping back to the start
+          local isStart = pos[1] == self.selectedEntity.tx
+            and pos[2] == self.selectedEntity.ty
+          local isInBounds = pos[1] >= 1 and pos[1] <= map.w
+            and pos[2] >= 1 and pos[2] <= map.h
+          if not isStart and isInBounds then
             -- Check not in confirmed
             local notConfirmed = true
             for jj = 1,#confirmed do

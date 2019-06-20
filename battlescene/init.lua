@@ -1,6 +1,7 @@
 local tile = require "battlescene.tile"
 local map_m = require "battlescene.map"
 local moveoverlay_m = require "battlescene.moveoverlay"
+local commandoverlay_m = require "battlescene.commandoverlay"
 local command = require "battlescene.command"
 
 local Hero0 = require "entities.hero0"
@@ -9,22 +10,6 @@ local battleScene = {
   --| Queued commands for this turn - commands execute asynchronously, so we add
   --| them all here, then execute them all.
   currTurnCommands = {} }
-
---| Add a move command for the given (wrapped) entity e to the given tile
---| position tx,ty. A move is effectively a teleport, but takes time based on
---| the distance (hamiltonian distance to (tx,ty) / e.e.movement)
-function battleScene:addMoveCommand(e, tx, ty)
-  assert(tx >= 1 and tx <= self.map.w and ty >= 1 and ty <= self.map.h)
-  -- Check this entity isn't already moving - if it is, remove the old command
-  for ii = 1,#self.currTurnCommands do
-    local c = self.currTurnCommands[ii]
-    if c.command == command.move and c.e == e then
-      table.remove(self.currTurnCommands, ii)
-      break
-    end
-  end
-  table.insert(self.currTurnCommands, command.MoveCommand(e, tx, ty))
-end
 
 function battleScene:init()
   -- Create a 10x10 map of plain tiles
@@ -45,14 +30,21 @@ function battleScene:init()
   --                      1 + math.floor(math.random() * 10),
   --                   1 + math.floor(math.random() * 10))
   self.map:addEntity(Hero0(), 6, 7)
+  self.map:addEntity(Hero0(), 7, 7)
 
   local moveOverlay = moveoverlay_m()
   self.map:addTileOverlay(moveOverlay)
+  local commandOverlay = commandoverlay_m(self.currTurnCommands)
+  self.map:addTileOverlay(commandOverlay)
 
   self.map:addSelectListener(function(tx,ty)
       local entityPressed = self.map:getEntity(tx, ty)
       -- Try and move this entity
       if entityPressed == nil and battleScene.selectedEntity ~= nil then
+        -- Search for this entity's commands and remove them, since regardless
+        -- we want to either remove the current command or replace it with
+        -- another
+        self:clearEntityCommands(battleScene.selectedEntity)
         -- Check if we can move this, using movementTiles in the moveOverlay
         for ii = 1,#moveOverlay.movementTiles do
           local t = moveOverlay.movementTiles[ii]
@@ -69,6 +61,24 @@ function battleScene:init()
       moveOverlay:setSelectedEntity(self.map, battleScene.selectedEntity)
   end)
 end
+
+function battleScene:clearEntityCommands(e)
+  for ii = 1,#self.currTurnCommands do
+    if self.currTurnCommands[ii].e == e then
+      table.remove(self.currTurnCommands, ii)
+      break
+    end
+  end
+end
+
+--| Add a move command for the given (wrapped) entity e to the given tile
+--| position tx,ty. A move is effectively a teleport, but takes time based on
+--| the distance (hamiltonian distance to (tx,ty) / e.e.movement)
+function battleScene:addMoveCommand(e, tx, ty)
+  assert(tx >= 1 and tx <= self.map.w and ty >= 1 and ty <= self.map.h)
+  table.insert(self.currTurnCommands, command.MoveCommand(e, tx, ty))
+end
+
 
 function battleScene:draw()
   love.graphics.push()
