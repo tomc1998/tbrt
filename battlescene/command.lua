@@ -9,6 +9,17 @@ function mod.MoveCommand(e, tx, ty)
     local hamiltonian = math.abs(self.tx - e.tx) + math.abs(self.ty - e.ty)
     return hamiltonian / e.e.movement
   end
+
+  --| Set color associated with this command using love.graphics.setColor
+  function cmd:setColor(opacity)
+    if opacity == nil then opacity = 1.0 end
+    if self.command == mod.move then
+      love.graphics.setColor(1, 1, 0, opacity)
+    else
+      assert(false, "Bad command " .. tostring(c.command))
+    end
+  end
+
   return cmd
 end
 

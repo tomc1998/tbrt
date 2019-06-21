@@ -1,5 +1,6 @@
-Gamestate = require "hump.gamestate"
-battleScene = require "battlescene"
+local Gamestate = require "hump.gamestate"
+local Timer = require 'hump.timer'
+local battleScene = require "battlescene"
 
 function love.load()
   Gamestate.registerEvents()
@@ -7,6 +8,7 @@ function love.load()
 end
 
 function love.update(dt)
+  Timer.update(dt)
 end
 
 function love.draw()

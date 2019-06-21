@@ -1,6 +1,7 @@
 local tile = require "battlescene.tile"
 local map_m = require "battlescene.map"
 local moveoverlay_m = require "battlescene.moveoverlay"
+local turntimer_m = require "battlescene.turntimer"
 local commandoverlay_m = require "battlescene.commandoverlay"
 local commandtimeoverlay_m = require "battlescene.commandtimeoverlay"
 local command = require "battlescene.command"
@@ -10,7 +11,11 @@ local battleScene = {
   map=nil,
   --| Queued commands for this turn - commands execute asynchronously, so we add
   --| them all here, then execute them all.
-  currTurnCommands = {} }
+  currTurnCommands = {},
+  turnTimer = nil
+}
+
+battleScene.turnTimer = turntimer_m(battleScene.currTurnCommands)
 
 function battleScene:init()
   -- Create a 10x10 map of plain tiles
@@ -86,6 +91,9 @@ end
 function battleScene:draw()
   love.graphics.push()
   self.map:draw(0, 0)
+  local w = love.graphics.getWidth()
+  local h = love.graphics.getHeight()
+  self.turnTimer:draw(20, h - 20, w - 40, 20)
   love.graphics.pop()
 end
 
