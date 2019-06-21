@@ -17,7 +17,9 @@ return function(commands)
   }
 
   --| Draw this turn timer at the given x,y with the given width and height
-  function turnTimer:draw(x, y, w, h)
+  function turnTimer:draw(x, y, w, h, alteredStart)
+    local start = 0.0
+    if alteredStart ~= nil then start = alteredStart end
     -- Find the longest command
     local longest = 0
     for ii=1,#self.commands do
@@ -39,7 +41,7 @@ return function(commands)
     love.graphics.line(x, y, x+w, y)
     -- Draw start / end labels
     local font = love.graphics.getFont()
-    local startText = string.format("%.2f", 0)
+    local startText = string.format("%.2f", start)
     local startTextW = font:getWidth(startText)
     local startTextH = font:getHeight(startText)
     love.graphics.print(startText, x - startTextW/2, y - h/2 - startTextH)
@@ -48,11 +50,15 @@ return function(commands)
     local endTextH = font:getHeight(endText)
     love.graphics.print(endText, x + w - endTextW/2, y - h/2 - endTextH)
 
-    -- Draw marks every 0.1
-    local tt = 0.0
+    -- Draw marks every 0.1, on every 0.1. First round start UP to the nearest 0.1.
+    local roundedStart = math.floor(start / 0.1) * 0.1
+    if start < roundedStart then roundedStart = math.ceil(start / 0.1) * 0.1 end
+    local tt = roundedStart
     while tt < self.currLongest[1] do
-      local off = (tt / self.currLongest[1]) * w
-      love.graphics.line(x+off, y-self.stretch[1]*h/4, x+off, y+self.stretch[1]*h/4)
+      local off = ((tt-start) / (self.currLongest[1]-start)) * w
+      if off > 0 then
+        love.graphics.line(x+off, y-self.stretch[1]*h/4, x+off, y+self.stretch[1]*h/4)
+      end
       tt = tt + 0.1
     end
 
@@ -60,9 +66,11 @@ return function(commands)
     for ii=1,#self.commands do
       local c = self.commands[ii]
       local time = c:getTime()
-      local off = (time / self.currLongest[1]) * w
-      c:setColor(0.8)
-      love.graphics.rectangle('fill', x+off-h/4, y-h/4, h/2, h/2)
+      if time > start then 
+        local off = ((time - start) / (self.currLongest[1] - start)) * w
+        c:setColor(0.8)
+        love.graphics.rectangle('fill', x+off-h/4, y-h/4, h/2, h/2)
+      end
     end
   end
 

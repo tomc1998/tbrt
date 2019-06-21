@@ -20,6 +20,11 @@ function mod.MoveCommand(e, tx, ty)
     end
   end
 
+  function cmd:execute(map)
+    self.e.tx = self.tx
+    self.e.ty = self.ty
+  end
+
   return cmd
 end
 

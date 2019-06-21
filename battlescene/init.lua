@@ -7,12 +7,20 @@ local commandtimeoverlay_m = require "battlescene.commandtimeoverlay"
 local command = require "battlescene.command"
 
 local Hero0 = require "entities.hero0"
+
+local BattleSceneState = {
+  planning=0,
+  executing=1,
+}
+
 local battleScene = {
   map=nil,
   --| Queued commands for this turn - commands execute asynchronously, so we add
   --| them all here, then execute them all.
   currTurnCommands = {},
-  turnTimer = nil
+  turnTimer = nil,
+  state = BattleSceneState.planning,
+  executionTimer = 0.0,
 }
 
 battleScene.turnTimer = turntimer_m(battleScene.currTurnCommands)
@@ -57,10 +65,21 @@ function battleScene:init()
         for ii = 1,#moveOverlay.movementTiles do
           local t = moveOverlay.movementTiles[ii]
           if t[1] == tx and t[2] == ty then
-            -- This IS a tile we can move to - move the entity to this tile
-            battleScene:addMoveCommand(battleScene.selectedEntity, tx, ty);
-            battleScene.selectedEntity = nil
-            moveOverlay:setSelectedEntity(self.map, battleScene.selectedEntity)
+            -- This IS a tile we can move to - check there are no other entities
+            -- moving to this square
+            local otherEntityMovingToTile = false
+            for jj = 1,#self.currTurnCommands do
+              local c = self.currTurnCommands[jj]
+              if c.command == command.move and c.tx == tx and c.ty == ty then
+                otherEntityMovingToTile = true
+                break
+              end
+            end
+            if not otherEntityMovingToTile then
+              battleScene:addMoveCommand(battleScene.selectedEntity, tx, ty);
+              battleScene.selectedEntity = nil
+              moveOverlay:setSelectedEntity(self.map, battleScene.selectedEntity)
+            end
             return
           end
         end
@@ -93,28 +112,64 @@ function battleScene:draw()
   self.map:draw(0, 0)
   local w = love.graphics.getWidth()
   local h = love.graphics.getHeight()
-  self.turnTimer:draw(20, h - 20, w - 40, 20)
+  if self.state == BattleSceneState.executing then
+    self.turnTimer:draw(20, h - 20, w - 40, 20, self.executionTimer)
+  else
+    self.turnTimer:draw(20, h - 20, w - 40, 20, 0.0)
+  end
   love.graphics.pop()
+end
+
+function battleScene:setStatePlanning()
+  local ncmd = #self.currTurnCommands
+  for ii=1,ncmd do self.currTurnCommands[ii] = nil end
+  self.state = BattleSceneState.planning
+end
+
+function battleScene:setStateExecuting()
+  self.executionTimer = 0.0
+  self.state = BattleSceneState.executing
 end
 
 function battleScene:update(dt)
   self.map:update(dt)
+  if self.state == BattleSceneState.executing then
+    -- Advance the timer, pop commands off until the command list is empty OR
+    -- the last command's time > the current timer
+    self.executionTimer = self.executionTimer + dt
+    local ncmd = #self.currTurnCommands
+    while ncmd > 0 and self.currTurnCommands[ncmd]:getTime() < self.executionTimer do
+      -- Pop the last command & execute
+      local cmd = table.remove(self.currTurnCommands, ncmd)
+      cmd:execute();
+      ncmd = ncmd - 1
+    end
+    if ncmd == 0 then
+      self:setStatePlanning()
+    end
+  end
 end
 
 function battleScene:keypressed(key, scancode, isrepeat)
-  if not isrepeat and key == 'return' then
-    -- End turn
-    for ii = 1,#self.currTurnCommands do
-      for k,v in pairs(self.currTurnCommands[ii]) do print(k,v) end
-      print(self.currTurnCommands[ii]:getTime())
-      print ""
-    end
-    print "\n"
+  if self.state == BattleSceneState.planning and not isrepeat and key == 'return' then
+    -- End turn, loop over commands in time order and execute them after the
+    -- given delay.
+    -- First sort the commands backwards, such that the commands will be
+    -- executed back to front
+    table.sort(self.currTurnCommands,
+               function(l,r) return l:getTime() > r:getTime() end)
+
+    -- Now set the state as 'executing', meaning we won't be able to put in any
+    -- more commands, and the commands will be executed in order and popped off
+    -- the list
+    self:setStateExecuting()
   end
 end
 
 function battleScene:mousepressed(x, y, button, istouch, presses)
-  self.map:mousepressed(x, y, button, istouch, presses)
+  if self.state == BattleSceneState.planning then
+    self.map:mousepressed(x, y, button, istouch, presses)
+  end
 end
 
 return battleScene
