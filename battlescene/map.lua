@@ -15,17 +15,13 @@ local function worldToTile(x) return math.floor(x / (mod.TILE_SIZE + TILE_BORDER
 --|
 --| A map manages entities. You can add an entity by calling the addEntity
 --| method - each entity should be a table with the following methods:
---|  function entity:draw(x, y, tx, ty)
+--|  function entity:draw(x, y)
 --|    @param x - X position of centre of tile (world coords)
 --|    @param y - Y position of centre of tile (world coords)
---|    @param tx - X position (tile coords)
---|    @param ty - Y position (tile coords)
---|  function entity:update(dt, x, y, tx, ty)
+--|  function entity:update(dt, x, y)
 --|    @param dt - Delta time
 --|    @param x - X position of centre of tile (world coords)
 --|    @param y - Y position of centre of tile (world coords)
---|    @param tx - X position (tile coords)
---|    @param ty - Y position (tile coords)
 --| These will be called with the appropriate parameters.
 --|
 --| The map can be updated and drawn with the update(dt) and draw(x, y) methods.
@@ -56,8 +52,7 @@ function mod.Map(w, tiles)
     return self.tiles[(y-1) * self.w + x]
   end
 
-  --| gets the (wrapped) entity at the given tile position, or nil. Returns a
-  --| table where the position is e.tx, e.ty, and the entity is e.e.
+  --| gets the entity at the given tile position, or nil.
   function map:getEntity(x, y)
     for ii = 1,#self.entities do
       local e = self.entities[ii]
@@ -67,7 +62,6 @@ function mod.Map(w, tiles)
   end
 
   function map:draw(x, y)
-    love.graphics.push()
     love.graphics.setColor(0.8, 0.8, 0.8, 1)
     -- How much to multiply xpos / ypos in tile coords by to get the visual
     -- coords
@@ -112,22 +106,29 @@ function mod.Map(w, tiles)
       end
     end
 
-    love.graphics.pop()
-
-
     -- Draw entities
     for ii = 1,#self.entities do
       local e = self.entities[ii]
-      e.e:draw(x + tileToWorld(e.tx) + mod.TILE_SIZE/2,
-             y + tileToWorld(e.ty) + mod.TILE_SIZE/2,
-             e.tx, e.ty)
+      e:draw(x + tileToWorld(e.tx) + mod.TILE_SIZE/2,
+             y + tileToWorld(e.ty) + mod.TILE_SIZE/2)
     end
   end
 
+  function map:isWalkable(tx, ty)
+    local tiletype = self:get(tx, ty)
+    local ent = self:getEntity(tx, ty)
+    return tile.isWalkable(tiletype) and (ent == nil or not ent.isSolid)
+  end
+
+  --| Add an entity, adding metadata to the entity table containing stuff like tile
+  --| positions.
+  --| Fields added (and therefore clobbered):
+  --| * tx
+  --| * ty
   function map:addEntity(e, tx, ty)
-    -- Add an entity, wrapping the entity given in a table containing tile
-    -- positions and other metadata.
-    table.insert(self.entities, {e=e, tx=tx, ty=ty})
+    e.tx = tx
+    e.ty = ty
+    table.insert(self.entities, e)
   end
 
   function map:update(dt)
@@ -146,7 +147,7 @@ function mod.Map(w, tiles)
     -- Update entities
     for ii = 1,#self.entities do
       local e = self.entities[ii]
-      e.e:update(dt, tileToWorld(e.tx), tileToWorld(e.ty), e.tx, e.ty)
+      e:update(dt, tileToWorld(e.tx), tileToWorld(e.ty))
     end
   end
 

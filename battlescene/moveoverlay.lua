@@ -34,7 +34,7 @@ return function()
     while #positionsToExplore > 0 do
       local base_pos = table.remove(positionsToExplore, #positionsToExplore)
       -- Check if we have enough movement left to move here
-      local enoughMovement = base_pos[3]+1 <= self.selectedEntity.e.movement
+      local enoughMovement = base_pos[3]+1 <= self.selectedEntity.movement
       if enoughMovement then
         -- Get the positions we can reach from pos, and make sure we haven't
         -- already got these positions
@@ -62,8 +62,7 @@ return function()
             end
             if notConfirmed then
               -- Check this tile is walkable
-              tiletype = map:get(pos[1], pos[2])
-              if tile.isWalkable(tiletype) then
+              if map:isWalkable(pos[1], pos[2]) then
                 table.insert(positionsToExplore, pos)
                 table.insert(confirmed, pos)
               end

@@ -7,6 +7,7 @@ local commandtimeoverlay_m = require "battlescene.commandtimeoverlay"
 local command = require "battlescene.command"
 
 local Hero0 = require "entities.hero0"
+local SpikeTrap = require "entities.spiketrap"
 
 local BattleSceneState = {
   planning=0,
@@ -18,6 +19,7 @@ local battleScene = {
   --| Queued commands for this turn - commands execute asynchronously, so we add
   --| them all here, then execute them all.
   currTurnCommands = {},
+  otherCommands = {},
   turnTimer = nil,
   state = BattleSceneState.planning,
   executionTimer = 0.0,
@@ -40,11 +42,8 @@ function battleScene:init()
   self.map = map_m.Map(10, tiles)
 
   -- Add an entity
-  --self.map:addEntity(Hero0(),
-  --                      1 + math.floor(math.random() * 10),
-  --                   1 + math.floor(math.random() * 10))
   self.map:addEntity(Hero0(), 6, 7)
-  self.map:addEntity(Hero0(), 7, 7)
+  self.map:addEntity(SpikeTrap(), 7, 6)
 
   local moveOverlay = moveoverlay_m()
   self.map:addTileOverlay(moveOverlay)
@@ -55,6 +54,9 @@ function battleScene:init()
 
   self.map:addSelectListener(function(tx,ty)
       local entityPressed = self.map:getEntity(tx, ty)
+      if entityPressed ~= nil and not entityPressed.isAllied then
+        entityPressed = nil
+      end
       -- Try and move this entity
       if entityPressed == nil and battleScene.selectedEntity ~= nil then
         -- Search for this entity's commands and remove them, since regardless
@@ -87,6 +89,18 @@ function battleScene:init()
       battleScene.selectedEntity = entityPressed
       moveOverlay:setSelectedEntity(self.map, battleScene.selectedEntity)
   end)
+  self:addAllOtherEntityCommands()
+end
+
+--| For all the entities in the map, if they're not allied and have a
+--| getNextCommand function, call it and add it to the list of other commands.
+function battleScene:addAllOtherEntityCommands()
+  for ii = 1,#self.map.entities do
+    local e = self.map.entities[ii]
+    if not e.allied and e.getNextCommand ~= nil then
+      self:addOtherCommand(e:getNextCommand(self.map))
+    end
+  end
 end
 
 function battleScene:clearEntityCommands(e)
@@ -98,9 +112,29 @@ function battleScene:clearEntityCommands(e)
   end
 end
 
+--| Add a command which doesn't affect the turn time - this command can
+--| therefore span multiple turns. cmd must be a TimedCommand, since it needs to
+--| hold its time as state, so it can be decremented between turns.
+function battleScene:addOtherCommand(cmd)
+  assert(cmd.time ~= nil, "cmd must be a timed command.")
+  -- Add this at the right place in the list such that when executing the list
+  -- back to front we execute it in the right order. Assume list already sorted
+  -- in descending time order.
+  local inserted = false
+  for ii=1,#self.otherCommands do
+    local c = self.otherCommands[ii]
+    if c:getTime() < cmd:getTime() then
+      table.insert(self.otherCommands, ii, cmd)
+      break
+    end
+  end
+  -- Insert at end if it takes longer than everything else
+  if not inserted then table.insert(self.otherCommands, cmd) end
+end
+
 --| Add a move command for the given (wrapped) entity e to the given tile
 --| position tx,ty. A move is effectively a teleport, but takes time based on
---| the distance (hamiltonian distance to (tx,ty) / e.e.movement)
+--| the distance (hamiltonian distance to (tx,ty) / e.movement)
 function battleScene:addMoveCommand(e, tx, ty)
   assert(tx >= 1 and tx <= self.map.w and ty >= 1 and ty <= self.map.h)
   table.insert(self.currTurnCommands, command.MoveCommand(e, tx, ty))
@@ -123,6 +157,8 @@ end
 function battleScene:setStatePlanning()
   local ncmd = #self.currTurnCommands
   for ii=1,ncmd do self.currTurnCommands[ii] = nil end
+  -- Decrement the time for all the other commands
+  ncmd = #self.otherCommands
   self.state = BattleSceneState.planning
 end
 
@@ -137,6 +173,29 @@ function battleScene:update(dt)
     -- Advance the timer, pop commands off until the command list is empty OR
     -- the last command's time > the current timer
     self.executionTimer = self.executionTimer + dt
+
+    local newOtherCmds = {}
+    -- First do the othercommands list. To start with, subtract dt from the
+    -- commands' times
+    local ncmd = #self.otherCommands
+    for ii=1,ncmd do
+      self.otherCommands[ii].time = self.otherCommands[ii].time - dt
+    end
+    -- Then, remove all the ones which are < 0
+    while ncmd > 0 and self.otherCommands[ncmd]:getTime() < 0 do
+      local cmd = table.remove(self.otherCommands, ncmd)
+      cmd:execute(self.map)
+      -- Now that we've executed this command, get the associated entity and add
+      -- their next command to the list.
+      local newCmd = cmd.e:getNextCommand(self.map)
+      table.insert(newOtherCmds, newCmd)
+      ncmd = ncmd - 1
+    end
+
+    -- Add new commands for commands that just finished
+    for ii = 1,#newOtherCmds do self:addOtherCommand(newOtherCmds[ii]) end
+
+    -- Not do the currturncommands, if we run out of those, go back to planning
     local ncmd = #self.currTurnCommands
     while ncmd > 0 and self.currTurnCommands[ncmd]:getTime() < self.executionTimer do
       -- Pop the last command & execute
